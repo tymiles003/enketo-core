@@ -354,7 +354,8 @@ define( [ "js/Form" ], function( Form ) {
     } );
 
     describe( 'calculations', function( ) {
-        var formH, dataO, input1, input2,
+        console.log( 'starting caclultations test' );
+        var formH, dataO,
             form = loadForm( 'calcs_in_repeats.xml' );
         form.init( );
         formH = form.getFormO( );
@@ -363,9 +364,14 @@ define( [ "js/Form" ], function( Form ) {
             formH.$.find( 'button.repeat' ).click( );
             formH.$.find( '[name="/calcs_in_repeats/rep1/num1"]:eq(0)' ).val( '10' ).trigger( 'change' );
             formH.$.find( '[name="/calcs_in_repeats/rep1/num1"]:eq(1)' ).val( '20' ).trigger( 'change' );
+            console.log( 'model: ', dataO.getStr( ) );
+            expect( dataO.node( '/calcs_in_repeats/rep1/num1', 0 ).getVal( )[ 0 ] ).toEqual( '10' );
+            expect( dataO.node( '/calcs_in_repeats/rep1/num1', 1 ).getVal( )[ 0 ] ).toEqual( '20' );
             expect( dataO.node( '/calcs_in_repeats/rep1/calc3', 0 ).getVal( )[ 0 ] ).toEqual( '200' );
             expect( dataO.node( '/calcs_in_repeats/rep1/calc3', 1 ).getVal( )[ 0 ] ).toEqual( '400' );
+            console.log( 'finished calc test' );
         } );
+
     } );
 
 
@@ -407,10 +413,10 @@ define( [ "js/Form" ], function( Form ) {
         } );
 
         /*
-	Issue 208 was a combination of two issues:
-		1. branch logic wasn't evaluated on repeated radiobuttons (only on the original) in branch.update()
-		2. position[i] wasn't properly injected in makeBugCompiant() if the context node was a radio button or checkbox
-	 */
+            Issue 208 was a combination of two issues:
+            1. branch logic wasn't evaluated on repeated radiobuttons (only on the original) in branch.update()
+            2. position[i] wasn't properly injected in makeBugCompiant() if the context node was a radio button or checkbox
+        */
         it( 'a) evaluates relevant logic on a repeated radio-button-question and b) injects the position correctly (issue 208)', function( ) {
             var repeatSelector = 'fieldset.jr-repeat[name="/issue208/rep"]';
             //form = new Form(formStr7, dataStr7);
