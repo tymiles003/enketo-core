@@ -145,10 +145,12 @@ define( [ 'text!enketo-config', 'Modernizr', 'jquery' ], function( configStr, Mo
 
     function create( $group ) {
         var widget, $els;
-
-        console.log( 'widgets', widgetConfig );
+        //profiler.time( 'all widget modules init' );
+        //console.log( 'widgets', widgetConfig );
         for ( var i = 0; i < widgetConfig.length; i++ ) {
+
             widget = widgetConfig[ i ];
+            //profiler.time( widget.name + ' init' );
             widget.options = widget.options || {};
             widget.options.touch = Modernizr.touch;
 
@@ -165,7 +167,9 @@ define( [ 'text!enketo-config', 'Modernizr', 'jquery' ], function( configStr, Mo
                 setLangChangeHandler( widget, $els );
                 setOptionChangeHandler( widget, $els );
             }
+            //profiler.timeEnd( widget.name + ' init' );
         }
+        //profiler.timeEnd( 'all widget modules init' );
     }
 
     /**

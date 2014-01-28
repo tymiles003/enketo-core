@@ -49,21 +49,25 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                 model = new FormModel( dataStr );
                 form = new FormView( formSelector );
 
-                //var profiler = new Profiler('model.init()');
+                profiler.time( 'form.model init' );
                 loadErrors = loadErrors.concat( model.init() );
+                profiler.timeEnd( 'form.model init' );
 
-                //profiler.report();
-
+                profiler.time( 'loading existing instance' );
                 if ( typeof dataStrToEdit !== 'undefined' && dataStrToEdit && dataStrToEdit.length > 0 ) {
                     dataToEdit = new FormModel( dataStrToEdit );
                     loadErrors = loadErrors.concat( dataToEdit.init() );
                     this.load( dataToEdit );
                 }
-                repeatsPresent = ( $( formSelector ).find( '.or-repeat' ).length > 0 );
+                profiler.timeEnd( 'loading existing instance' );
 
-                //profiler = new Profiler('html form.init()');
+                profiler.time( 'determining if repeats are present' );
+                repeatsPresent = ( $( formSelector ).find( '.or-repeat' ).length > 0 );
+                profiler.timeEnd( 'determining if repeats are present' );
+
+                profiler.time( 'form.form init' );
                 form.init();
-                //profiler.report();
+                profiler.timeEnd( 'form.form init' );
 
                 if ( loadErrors.length > 0 ) {
                     console.error( 'loadErrors: ', loadErrors );
@@ -284,57 +288,62 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
             }
 
             FormView.prototype.init = function() {
-                var name, $required, $hint;
 
                 if ( typeof model == 'undefined' || !( model instanceof FormModel ) ) {
                     return console.error( 'variable data needs to be defined as instance of FormModel' );
                 }
 
-                //var profiler = new Profiler('preloads.init()');
+                profiler.time( 'preloads initialization' );
                 this.preloads.init( this ); //before widgets.init (as instanceID used in offlineFilepicker widget)
-                //profiler.report();
+                profiler.timeEnd( 'preloads initialization' );
 
+                profiler.time( 'disable calcs' );
                 this.grosslyViolateStandardComplianceByIgnoringCertainCalcs(); //before calcUpdate!
+                profiler.timeEnd( 'disable calcs' );
 
-                //profiler = new Profiler('calcupdate');
+                profiler.time( 'calculations initialization' );
                 this.calcUpdate(); //before repeat.init as repeat count may use a calculated item
-                //profiler.report();
+                profiler.timeEnd( 'calculations initialization' );
 
-                //profiler = new Profiler('setLangs()');
+                profiler.time( 'language initialization' );
                 this.langs.init(); //test: before itemsetUpdate
-                //profiler.report();
+                profiler.timeEnd( 'language initialization' );
 
-                //profiler = new Profiler('repeat.init()');
+                profiler.time( 'repeats initialization' );
                 this.repeat.init( this ); //after radio button data-name setting
-                //profiler.report();
+                profiler.timeEnd( 'repeats initialization' );
 
-                //profiler = new Profiler('itemsets initialization');
+                profiler.time( 'itemsets initialization' );
                 this.itemsetUpdate();
-                //profiler.report();
+                profiler.timeEnd( 'itemsets initialization' );
 
-                //profiler = new Profiler('setting default values in form inputs');
+                profiler.time( 'setting defaults' );
                 this.setAllVals();
-                //profiler.report();
+                profiler.timeEnd( 'setting defaults' );
 
-                //profiler = new Profiler('widgets initialization');
+                profiler.time( 'widgets initialization' );
                 widgets.init(); //after setAllVals()
-                //profiler.report();
+                profiler.timeEnd( 'widgets initialization' );
 
-                //profiler = new Profiler('bootstrapify');
+                profiler.time( 'bootstrapify' );
                 this.bootstrapify();
-                //profiler.report();
+                profiler.timeEnd( 'bootstrapify' );
 
-                //profiler = new Profiler('branch.init()');
+                profiler.time( 'branch initialization' );
                 this.branch.init(); //after widgets.init()
-                //profiler.report();
+                profiler.timeEnd( 'branch initialization' );
 
+                profiler.time( 'pages initialization' );
                 this.pages.init(); // after branch.init();
+                profiler.timeEnd( 'pages initialization' );
 
-                //profiler = new Profiler('outputUpdate initial');
+                profiler.time( 'outputUpdate initialization' );
                 this.outputUpdate();
-                //profiler.report();
+                profiler.timeEnd( 'outputUpdate initialization' );
 
+                profiler.time( 'setting event handlers' );
                 this.setEventHandlers(); //after widgets init to make sure widget handlers are called before
+                profiler.timeEnd( 'setting event handlers' );
 
                 this.editStatus.set( false );
                 //profiler.report('time taken across all functions to evaluate '+xpathEvalNum+' XPath expressions: '+xpathEvalTime);
