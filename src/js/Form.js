@@ -53,13 +53,14 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                 loadErrors = loadErrors.concat( model.init() );
                 profiler.timeEnd( 'form.model init' );
 
-                profiler.time( 'loading existing instance' );
+
                 if ( typeof dataStrToEdit !== 'undefined' && dataStrToEdit && dataStrToEdit.length > 0 ) {
                     dataToEdit = new FormModel( dataStrToEdit );
                     loadErrors = loadErrors.concat( dataToEdit.init() );
+                    profiler.time( 'loading existing instance' );
                     this.load( dataToEdit );
+                    profiler.timeEnd( 'loading existing instance' );
                 }
-                profiler.timeEnd( 'loading existing instance' );
 
                 profiler.time( 'determining if repeats are present' );
                 repeatsPresent = ( $( formSelector ).find( '.or-repeat' ).length > 0 );
