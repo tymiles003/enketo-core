@@ -322,9 +322,9 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                 this.setAllVals();
                 profiler.timeEnd( 'setting defaults' );
 
-                profiler.time( 'widgets initialization' );
+                //profiler.time( 'widgets initialization' );
                 widgets.init(); //after setAllVals()
-                profiler.timeEnd( 'widgets initialization' );
+                //profiler.timeEnd( 'widgets initialization' );
 
                 profiler.time( 'bootstrapify' );
                 this.bootstrapify();
