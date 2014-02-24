@@ -110,15 +110,6 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
             this.setRecordName = function( name ) {
                 return form.recordName.set( name );
             };
-            //            this.getRecordStatus = function() {
-            //                return form.recordStatus.get();
-            //            };
-            //            /**
-            //             * @param {(boolean|string)=} markedFinal
-            //             */
-            //            this.setRecordStatus = function( markedFinal ) {
-            //                return form.recordStatus.set( markedFinal );
-            //            };
             /**
              * @param { boolean } status [description]
              */
@@ -747,6 +738,7 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
             FormView.prototype.setAllVals = function() {
                 var index, name, value,
                     that = this;
+
                 model.node( null, null, {
                     noEmpty: true
                 } ).get().each( function() {
@@ -846,6 +838,30 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
             };
 
             /**
+             * Crafts a jQuery selector for element attributes that contain an expression with a target node name.
+             * The target node name is ALWAYS at the END of a path inside the expression.
+             *
+             * @param  {string} attribute The attribute name to search for
+             * @param  {string} nodeName  The node name to look for
+             * @param  {?string} filter   The optional filter to append to each selector
+             * @return {Array.<string>}   An array of jQuery selectors
+             */
+            FormView.prototype.getAttributeSelector = function( attribute, nodeName, filter ) {
+                var selector = [];
+
+                filter = filter || '';
+
+                // #1: followed by space
+                selector.push( '[' + attribute + '*="/' + nodeName + ' "]' + filter );
+                // #2: followed by )
+                selector.push( '[' + attribute + '*="/' + nodeName + ')"]' + filter );
+                // #3: at the end of an expression
+                selector.push( '[' + attribute + '$="/' + nodeName + '"]' + filter );
+
+                return selector;
+            };
+
+            /**
              * Branch Class (inherits properties of FormView Class) is used to manage skip logic
              *
              * @constructor
@@ -876,7 +892,7 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                     cleverSelector = ( namesArr.length > 0 ) ? [] : [ '[data-relevant]' ];
 
                     for ( i = 0; i < namesArr.length; i++ ) {
-                        cleverSelector.push( '[data-relevant*="' + namesArr[ i ] + '"]' );
+                        cleverSelector = cleverSelector.concat( parent.getAttributeSelector( 'data-relevant', namesArr[ i ] ) );
                     }
 
                     clonedRepeatsPresent = ( repeatsPresent && $form.find( '.or-repeat.clone' ).length > 0 ) ? true : false;
@@ -1079,15 +1095,16 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                     cleverSelector = [ '.itemset-template' ];
                 } else {
                     $.each( changedDataNodeNames.split( ',' ), function( index, value ) {
-                        // Note the space after value (#1), and ] after value (#2) to only look at the node name as leaf value
-                        // If this is safe, it could mean a gigantic performance improvement for some forms (like bench8)
-                        // where there are multiple cascades with names such as country, country1, country2
-                        // TODO: using a forward slash before value would be safe for XLSForm produced forms and mean 
-                        // further improvements
-                        /*#1*/
-                        cleverSelector.push( '.itemset-template[data-items-path*="' + value + ' "]' );
-                        /*#2*/
-                        cleverSelector.push( '.itemset-template[data-items-path*="' + value + ']"]' );
+                        /* 
+                         * Note the space after value (#1), and ] after value (#2) to only look at the node name at end of path
+                         * This introduces a gigantic performance improvement for some forms (like bench8)
+                         * where there are multiple cascades with names such as country, country1, country2
+                         */
+
+                        // #1 
+                        cleverSelector.push( '.itemset-template[data-items-path*="/' + value + ' "]' );
+                        // #2
+                        cleverSelector.push( '.itemset-template[data-items-path*="/' + value + ']"]' );
                     } );
                 }
 
@@ -1110,9 +1127,9 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                     context = that.input.getName( $input );
 
                     /*
-                    Determining the index is expensive, so we only do this when the itemset is inside a cloned repeat.
-                    It can be safely set to 0 for other branches.
-                    */
+                     * Determining the index is expensive, so we only do this when the itemset is inside a cloned repeat.
+                     * It can be safely set to 0 for other branches.
+                     */
                     insideRepeat = ( clonedRepeatsPresent && $input.closest( '.or-repeat' ).length > 0 ) ? true : false;
                     insideRepeatClone = ( clonedRepeatsPresent && $input.closest( '.or-repeat.clone' ).length > 0 ) ? true : false;
 
@@ -1207,7 +1224,7 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                 namesArr = ( typeof changedNodeNames !== 'undefined' ) ? changedNodeNames.split( ',' ) : [];
                 cleverSelector = ( namesArr.length > 0 ) ? [] : [ '.or-output[data-value]' ];
                 for ( i = 0; i < namesArr.length; i++ ) {
-                    cleverSelector.push( '.or-output[data-value*="' + namesArr[ i ] + '"]' );
+                    cleverSelector = cleverSelector.concat( this.getAttributeSelector( 'data-value', namesArr[ i ], '.or-output' ) );
                 }
                 clonedRepeatsPresent = ( repeatsPresent && $form.find( '.or-repeat.clone' ).length > 0 ) ? true : false;
 
@@ -1216,12 +1233,12 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                     //context = that.input.getName($(this).closest('fieldset'));
 
                     /*
-                    Note that in XForms input is the parent of label and in HTML the other way around so an output inside a label
-                    should look at the HTML input to determine the context. 
-                    So, context is either the input name attribute (if output is inside input label),
-                    or the parent with a name attribute
-                    or the whole doc
-                    */
+                     * Note that in XForms input is the parent of label and in HTML the other way around so an output inside a label
+                     * should look at the HTML input to determine the context.
+                     * So, context is either the input name attribute (if output is inside input label),
+                     * or the parent with a name attribute
+                     * or the whole document
+                     */
                     $context = ( $( this ).parent( 'span' ).parent( 'label' ).find( '[name]' ).eq( 0 ).length === 1 ) ?
                         $( this ).parent().parent().find( '[name]:eq(0)' ) :
                         $( this ).parent( 'span' ).parent( 'legend' ).parent( 'fieldset' ).find( '[name]' ).eq( 0 ).length === 1 ?
@@ -1283,10 +1300,14 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                 namesArr = ( typeof changedNodeNames !== 'undefined' ) ? changedNodeNames.split( ',' ) : [];
                 cleverSelector = ( namesArr.length > 0 ) ? [] : [ '[data-calculate]' ];
                 for ( i = 0; i < namesArr.length; i++ ) {
-                    // select the calculated items that include the changed node PLUS
-                    // the calculated items that have relevant logic that include the changed node
-                    // selects both inputs and textareas
-                    cleverSelector.push( '[data-calculate*="' + namesArr[ i ] + '"], [data-relevant*="' + namesArr[ i ] + '"][data-calculate]' );
+                    /* 
+                     * Select the calculated items that include the changed node PLUS
+                     * the calculated items that have relevant logic that include the changed node
+                     */
+
+                    cleverSelector = cleverSelector
+                        .concat( this.getAttributeSelector( 'data-calculate', namesArr[ i ] ) )
+                        .concat( this.getAttributeSelector( 'data-relevant', namesArr[ i ], '[data-calculate]' ) );
                 }
 
                 $form.find( cleverSelector.join() ).each( function() {
@@ -1811,13 +1832,9 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                     //that.validateInvalids();
                 } );
 
-                //$form.on('beforesave', function( event ) {
-                //  that.validateAll();
-                //});
 
                 $form.on( 'changelanguage', function() {
                     that.outputUpdate();
-                    //that.setHints( );
                 } );
             };
 
