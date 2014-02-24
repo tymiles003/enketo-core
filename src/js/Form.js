@@ -1354,10 +1354,11 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                 $form.find( '.or-constraint-msg' ).each( function() {
                     var $question = $( this ).closest( '.question' ).not( '.or-appearance-label' ),
                         $constraintMsg = $( this ).detach(),
+                        isRequired = $question.find( '[required]' ).length > 0,
                         hasRequiredMsg = $question.find( '.or-required-msg' ).length > 0;
 
                     $question.append( $constraintMsg );
-                    if ( !hasRequiredMsg ) {
+                    if ( !hasRequiredMsg && isRequired ) {
                         $constraintMsg.after( '<span class="or-required-msg active" lang="">This field is required</span>' );
                     }
                 } );
