@@ -828,7 +828,7 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
             };
 
             /**
-             * Crafts a jQuery selector for element attributes that contain an expression with a target node name.
+             * Crafts an optimized jQuery selector for element attributes that contain an expression with a target node name.
              * The target node name is ALWAYS at the END of a path inside the expression.
              *
              * @param  {string} attribute The attribute name to search for
@@ -919,7 +919,8 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                         if ( !insideRepeat ) {
                             cacheIndex = p.relevant;
                         } else {
-                            //cacheIndex = p.relevant+'__'+p.path+'__'+p.ind;
+                            // the path is stripped of the last nodeName to record the context.
+                            cacheIndex = p.relevant + '__' + p.path.substring( 0, p.path.lastIndexOf( '/' ) ) + '__' + p.ind;
                         }
                     }
                     if ( cacheIndex && typeof relevantCache[ cacheIndex ] !== 'undefined' ) {
