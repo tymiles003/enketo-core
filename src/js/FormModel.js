@@ -166,7 +166,12 @@ define( [ 'xpath', 'jquery', 'enketo-js/plugins', 'enketo-js/extend', 'jquery.xp
                 $target.text( newVal );
                 //then return validation result
                 success = this.validate( expr, xmlDataType );
-                $data.trigger( 'dataupdate', $target.prop( 'nodeName' ) );
+                $data.trigger( 'dataupdate', {
+                    updatedNodes: [ {
+                        name: $target.prop( 'nodeName' ),
+                        index: this.getIndex( $target )
+                    } ]
+                } );
                 //add type="file" attribute for file references
                 if ( xmlDataType === 'binary' ) {
                     if ( newVal.length > 0 ) {
@@ -204,26 +209,54 @@ define( [ 'xpath', 'jquery', 'enketo-js/plugins', 'enketo-js/extend', 'jquery.xp
             return vals;
         };
 
+        Nodeset.prototype.getIndex = function( $node ) {
+            var nodeName, path, $this, $family;
+
+            $node = $node || this.get();
+            if ( $node.length === 1 ) {
+                nodeName = $node.prop( 'nodeName' );
+                path = $node.getXPath( 'instance' );
+                $family = $data.find( nodeName ).filter( function() {
+                    $this = $( this );
+                    return !$this.attr( 'template' ) && $this.find( 'template' ).length === 0 && path === $this.getXPath( 'instance' );
+                } );
+                return ( $family.length === 1 ) ? null : $family.index( $node );
+            } else {
+                console.error( 'no node, or multiple nodes, provided to nodeset.getIndex' );
+                return -1;
+            }
+        };
+
         /**
          * Clone data node after all templates have been cloned (after initialization)
          *
          * @param  {jQuery} $precedingTargetNode the node after which to append the clone
          */
         Nodeset.prototype.clone = function( $precedingTargetNode ) {
-            var $dataNode, allClonedNodeNames;
+            var $dataNode, allClonedNodeNames, $this,
+                that = this;
 
             $dataNode = this.get();
             $precedingTargetNode = $precedingTargetNode || $dataNode;
 
             if ( $dataNode.length === 1 && $precedingTargetNode.length === 1 ) {
-                $dataNode.clone().insertAfter( $precedingTargetNode ).find( '*' ).addBack().removeAttr( 'template' );
+                $dataNode.clone().insertAfter( $precedingTargetNode ).find( '[template]' ).addBack().removeAttr( 'template' );
 
-                allClonedNodeNames = [ $dataNode.prop( 'nodeName' ) ];
+                allClonedNodeNames = [ {
+                    name: $dataNode.prop( 'nodeName' ),
+                    index: this.getIndex( $dataNode )
+                } ];
                 $dataNode.find( '*' ).each( function() {
-                    allClonedNodeNames.push( $( this ).prop( 'nodeName' ) );
+                    $this = $( this );
+                    allClonedNodeNames.push( {
+                        name: $this.prop( 'nodeName' ),
+                        index: that.getIndex( $this )
+                    } );
                 } );
 
-                $data.trigger( 'dataupdate', allClonedNodeNames.join( ',' ) );
+                $data.trigger( 'dataupdate', {
+                    updatedNodes: allClonedNodeNames
+                } );
             } else {
                 console.error( 'node.clone() function did not receive origin and target nodes' );
             }
@@ -235,8 +268,16 @@ define( [ 'xpath', 'jquery', 'enketo-js/plugins', 'enketo-js/extend', 'jquery.xp
         Nodeset.prototype.remove = function() {
             var dataNode = this.get();
             if ( dataNode.length > 0 ) {
+                // using index: -1 may have unintended consequences for functions that use
+                // indexed-repeat() or a hardcoded position /path/to/repeat[2]
+                // TODO: Need to revisit this.
                 dataNode.remove();
-                $data.trigger( 'dataupdate', dataNode.prop( 'nodeName' ) );
+                $data.trigger( 'dataupdate', {
+                    updatedNodes: [ {
+                        name: dataNode.prop( 'nodeName' ),
+                        index: -1
+                    } ]
+                } );
             } else {
                 console.error( 'could not find node ' + this.selector + ' with index ' + this.index + ' to remove ' );
             }
