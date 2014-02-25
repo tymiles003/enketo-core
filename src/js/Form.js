@@ -622,8 +622,15 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                     name = $node.attr( 'data-name' ) || $node.attr( 'name' );
                     return name || console.error( 'input node has no name' );
                 },
-                // the index that can be used to find the node in $data
-                // NOTE: this function should be used sparingly, as it is CPU intensive!
+                /**
+                 * Used to retrieve the index of a question amidst all questions with the same name.
+                 * The index that can be used to find the corresponding node in the model.
+                 * NOTE: this function should be used sparingly, as it is CPU intensive!
+                 * TODO: simplify this function by looking for nodes with same CLASS on wrapNode
+                 *
+                 * @param  {jQuery} $node The jQuery-wrapped input element
+                 * @return {number}       The index
+                 */
                 getIndex: function( $node ) {
                     var inputType, name, $wrapNode, $wrapNodesSameName;
                     if ( $node.length !== 1 ) {
@@ -854,10 +861,11 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
             /**
              * Updates branches
              *
-             * @param  {string=} changedNodeNames [description]
+             * @param {Array<{name: string, index: number}>=} updatedNodes Array of updated nodes
              */
-            FormView.prototype.branchUpdate = function( changedNodeNames ) {
-                var i, p, $branchNode, result, namesArr, cleverSelector, insideRepeat, insideRepeatClone, cacheIndex,
+            FormView.prototype.branchUpdate = function( updatedNodes ) {
+                var p, $branchNode, result, insideRepeat, insideRepeatClone, cacheIndex,
+                    cleverSelector = [],
                     relevantCache = {},
                     alreadyCovered = [],
                     that = this,
@@ -865,11 +873,13 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                     clonedRepeatsPresent;
 
 
-                namesArr = ( typeof changedNodeNames !== 'undefined' ) ? changedNodeNames.split( ',' ) : [];
-                cleverSelector = ( namesArr.length > 0 ) ? [] : [ '[data-relevant]' ];
-
-                for ( i = 0; i < namesArr.length; i++ ) {
-                    cleverSelector = cleverSelector.concat( this.getAttributeSelector( 'data-relevant', namesArr[ i ] ) );
+                if ( typeof updatedNodes == 'undefined' || updatedNodes.length === 0 ) {
+                    cleverSelector = [ '[data-relevant]' ];
+                } else {
+                    updatedNodes.forEach( function( node ) {
+                        cleverSelector = cleverSelector
+                            .concat( that.getAttributeSelector( 'data-relevant', node.name ) );
+                    } );
                 }
 
                 clonedRepeatsPresent = ( repeatsPresent && $form.find( '.or-repeat.clone' ).length > 0 ) ? true : false;
@@ -1037,22 +1047,21 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
 
             /**
              * Updates itemsets
-             * @param  {string=} changedDataNodeNames node names that were recently changed, separated by commas
+             *
+             * @param {Array<{name: string, index: number}>=} updatedNodes Array of updated nodes
              */
-            FormView.prototype.itemsetUpdate = function( changedDataNodeNames ) {
+            FormView.prototype.itemsetUpdate = function( updatedNodes ) {
                 var clonedRepeatsPresent, insideRepeat, insideRepeatClone,
                     that = this,
                     cleverSelector = [],
                     needToUpdateLangs = false,
                     itemsCache = {};
 
-                // console.time( 'itemsetUpdate' );
-                console.log( 'itemset update was called', changedDataNodeNames );
 
-                if ( typeof changedDataNodeNames == 'undefined' ) {
+                if ( typeof updatedNodes == 'undefined' || updatedNodes.length === 0 ) {
                     cleverSelector = [ '.itemset-template' ];
                 } else {
-                    $.each( changedDataNodeNames.split( ',' ), function( index, value ) {
+                    updatedNodes.forEach( function( node ) {
                         /* 
                          * Note the space after value (#1), and ] after value (#2) to only look at the node name at end of path
                          * This introduces a gigantic performance improvement for some forms (like bench8)
@@ -1060,9 +1069,9 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                          */
 
                         // #1 
-                        cleverSelector.push( '.itemset-template[data-items-path*="/' + value + ' "]' );
+                        cleverSelector.push( '.itemset-template[data-items-path*="/' + node.name + ' "]' );
                         // #2
-                        cleverSelector.push( '.itemset-template[data-items-path*="/' + value + ']"]' );
+                        cleverSelector.push( '.itemset-template[data-items-path*="/' + node.name + ']"]' );
                     } );
                 }
 
@@ -1164,26 +1173,29 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                     }
 
                 } );
-                // console.timeEnd( 'itemsetUpdate' );
             };
 
             /**
              * Updates output values, optionally filtered by those values that contain a changed node name
              *
-             * @param  {string=} changedNodeNames Comma-separated node names that may have changed
+             * @param {Array<{name: string, index: number}>=} updatedNodes Array of updated nodes
              */
-            FormView.prototype.outputUpdate = function( changedNodeNames ) {
-                var i, expr, namesArr, cleverSelector, clonedRepeatsPresent, insideRepeat, insideRepeatClone, $context, context, index,
+            FormView.prototype.outputUpdate = function( updatedNodes ) {
+                var expr, clonedRepeatsPresent, insideRepeat, insideRepeatClone, $context, context, index,
+                    cleverSelector = [],
                     outputChanged = false,
                     outputCache = {},
                     val = '',
                     that = this;
 
-                namesArr = ( typeof changedNodeNames !== 'undefined' ) ? changedNodeNames.split( ',' ) : [];
-                cleverSelector = ( namesArr.length > 0 ) ? [] : [ '.or-output[data-value]' ];
-                for ( i = 0; i < namesArr.length; i++ ) {
-                    cleverSelector = cleverSelector.concat( this.getAttributeSelector( 'data-value', namesArr[ i ], '.or-output' ) );
+                if ( typeof updatedNodes == 'undefined' || updatedNodes.length === 0 ) {
+                    cleverSelector = [ '.or-output[data-value]' ];
+                } else {
+                    updatedNodes.forEach( function( node ) {
+                        cleverSelector = cleverSelector.concat( that.getAttributeSelector( 'data-value', node.name, '.or-output' ) );
+                    } );
                 }
+
                 clonedRepeatsPresent = ( repeatsPresent && $form.find( '.or-repeat.clone' ).length > 0 ) ? true : false;
 
                 $form.find( ':not(:disabled) span.active' ).find( cleverSelector.join() ).each( function() {
@@ -1242,23 +1254,27 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
 
             /**
              * Updates calculated items
-             * @param {string=} changedNodeNames - [type/description]
+             *
+             * @param {Array<{name: string, index: number}>=} updatedNodes Array of updated nodes
              */
-            FormView.prototype.calcUpdate = function( changedNodeNames ) {
-                var i, index, name, expr, dataType, relevant, relevantExpr, result, constraint, namesArr, valid, cleverSelector, $this, $dataNodes,
+            FormView.prototype.calcUpdate = function( updatedNodes ) {
+                var name, expr, dataType, relevant, relevantExpr, result, constraint, valid, $this, $dataNodes,
+                    cleverSelector = [],
                     that = this;
 
-                namesArr = ( typeof changedNodeNames !== 'undefined' ) ? changedNodeNames.split( ',' ) : [];
-                cleverSelector = ( namesArr.length > 0 ) ? [] : [ '[data-calculate]' ];
-                for ( i = 0; i < namesArr.length; i++ ) {
-                    /* 
-                     * Select the calculated items that include the changed node PLUS
-                     * the calculated items that have relevant logic that include the changed node
-                     */
 
-                    cleverSelector = cleverSelector
-                        .concat( this.getAttributeSelector( 'data-calculate', namesArr[ i ] ) )
-                        .concat( this.getAttributeSelector( 'data-relevant', namesArr[ i ], '[data-calculate]' ) );
+                if ( typeof updatedNodes == 'undefined' || updatedNodes.length === 0 ) {
+                    cleverSelector = [ '[data-calculate]' ];
+                } else {
+                    updatedNodes.forEach( function( node ) {
+                        /* 
+                         * Select the calculated items that include the changed node PLUS
+                         * the calculated items that have relevant logic that include the changed node
+                         */
+                        cleverSelector = cleverSelector
+                            .concat( that.getAttributeSelector( 'data-calculate', node.name ) )
+                            .concat( that.getAttributeSelector( 'data-relevant', node.name, '[data-calculate]' ) );
+                    } );
                 }
 
                 $form.find( cleverSelector.join() ).each( function() {
@@ -1760,18 +1776,17 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                     }
                 } );
 
-                //nodeNames is comma-separated list as a string
-                model.$.on( 'dataupdate', function( event, nodeNames ) {
-                    that.calcUpdate( nodeNames ); //EACH CALCUPDATE THAT CHANGES A VALUE TRIGGERS ANOTHER CALCUPDATE => INEFFICIENT
-                    that.branchUpdate( nodeNames );
-                    that.outputUpdate( nodeNames );
-                    that.itemsetUpdate( nodeNames );
+                model.$.on( 'dataupdate', function( event, data ) {
+                    that.calcUpdate( data.updatedNodes ); //EACH CALCUPDATE THAT CHANGES A VALUE TRIGGERS ANOTHER CALCUPDATE => INEFFICIENT
+                    that.branchUpdate( data.updatedNodes );
+                    that.outputUpdate( data.updatedNodes );
+                    that.itemsetUpdate( data.updatedNodes );
                     //it is possible that a changed data value validates question that were previously invalidated
                     //that.validateInvalids();
                 } );
 
-                //edit is fired when the form changes due to user input or repeats added/removed
-                //branch update doesn't require detection as it always happens as a result of an event that triggers change or changerepeat.
+                // edit is fired when the form changes due to user input or repeats added/removed
+                // branch update doesn't require detection as it always happens as a result of an event that triggers change or changerepeat.
                 $form.on( 'change addrepeat removerepeat', function( event ) {
                     console.log( 'updating edit status' );
                     that.editStatus.set( true );
@@ -1779,7 +1794,7 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
 
                 $form.on( 'addrepeat', function( event ) {
                     //set defaults of added repeats, setAllVals does not trigger change event
-                    //TODO: only do this for the repeat that trigger it
+                    //TODO: only do this for the repeat that triggers it
                     that.setAllVals();
                     //the cloned fields may have been marked as invalid, so after setting thee default values, validate the invalid ones
                     //that.validateInvalids();
