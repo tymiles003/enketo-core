@@ -861,7 +861,6 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
 
                 // If the updated node is inside a repeat (and there are multiple repeats present)
                 if ( typeof updated.repeatPath !== 'undefined' && updated.repeatIndex >= 0 ) {
-                    console.log( 'going to find repeat with name', updated.repeatPath, 'and index', updated.repeatIndex );
                     $repeat = $form.find( '.or-repeat[name="' + updated.repeatPath + '"]' ).eq( updated.repeatIndex );
                 }
 
@@ -1267,8 +1266,6 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                 $nodes = this.getNodesToUpdate( 'data-calculate', '', updated );
                 // add relevant items that have a (any) calculation
                 $nodes = $nodes.add( this.getNodesToUpdate( 'data-relevant', '[data-calculate]' ) );
-
-                console.log( 'nodes to update', $nodes );
 
                 $nodes.each( function() {
                     var result, valid, $dataNodes, $dataNode, index,
@@ -1790,7 +1787,6 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                 // edit is fired when the form changes due to user input or repeats added/removed
                 // branch update doesn't require detection as it always happens as a result of an event that triggers change or changerepeat.
                 $form.on( 'change addrepeat removerepeat', function( event ) {
-                    console.log( 'updating edit status' );
                     that.editStatus.set( true );
                 } );
 

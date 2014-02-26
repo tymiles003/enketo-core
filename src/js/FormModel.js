@@ -713,7 +713,7 @@ define( [ 'xpath', 'jquery', 'enketo-js/plugins', 'enketo-js/extend', 'jquery.xp
         // try native to see if that works... (will not work if the expr contains custom OpenRosa functions)
         if ( tryNative && typeof instanceDoc.evaluate !== 'undefined' && !this.OPENROSA.test( expr ) ) {
             try {
-                console.log( 'trying the blazing fast native XPath Evaluator for', expr, index );
+                // console.log( 'trying the blazing fast native XPath Evaluator for', expr, index );
                 result = instanceDoc.evaluate( expr, context, null, resTypeNum, null );
             } catch ( e ) {
                 console.log( '%cWell native XPath evaluation that did not work... No worries, worth a shot, the expression probably ' +
@@ -724,7 +724,7 @@ define( [ 'xpath', 'jquery', 'enketo-js/plugins', 'enketo-js/extend', 'jquery.xp
         // if that didn't work, try the slow XPathJS evaluator 
         if ( !result ) {
             try {
-                console.log( 'trying the super slow XPathJS_javarosa evaluator for', expr, index );
+                // console.log( 'trying the super slow XPathJS_javarosa evaluator for', expr, index );
                 // bind the replacement evaluator to the instance of XMLDocument
                 XPathJS.bindDomLevel3XPath( instanceDoc );
                 result = instanceDoc.evaluate( expr, context, null, resTypeNum, null );
