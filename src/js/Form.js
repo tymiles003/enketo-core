@@ -886,9 +886,6 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                 }
 
                 //TODO: exclude descendents of disabled elements? .find( ':not(:disabled) span.active' )
-                console.log( 'collection', $collection );
-                console.log( 'repeat', $repeat );
-                console.log( 'selector', selector );
                 return $collection.find( selector.join() );
             };
 
@@ -1269,7 +1266,6 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
 
                 $nodes = this.getNodesToUpdate( 'data-calculate', '', updated );
                 // add relevant items that have a (any) calculation
-                // TODO: it would make sense to just add this to branchUpdate to clear any calculated item values
                 $nodes = $nodes.add( this.getNodesToUpdate( 'data-relevant', '[data-calculate]' ) );
 
                 console.log( 'nodes to update', $nodes );
@@ -1374,8 +1370,8 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                             console.error( 'Preload "' + item + '"" not supported. May or may not be a big deal.' );
                         }
                     } );
-                    //in addition the presence of certain meta data in the instance may automatically trigger a preload function
-                    //even if the binding is not present. Note, that this actually does not deal with HTML elements at all.
+                    // In addition the presence of certain meta data in the instance may automatically trigger a preload function
+                    // even if the binding is not present. Note, that this actually does not deal with HTML elements at all.
                     meta = model.node( '*>meta>*' );
                     meta.get().each( function() {
                         item = null;
@@ -1537,9 +1533,9 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
 
                     //delegated handlers (strictly speaking not required, but checked for doubling of events -> OK)
                     $form.on( 'click', 'button.repeat:enabled', function() {
-                        //create a clone
+                        // Create a clone
                         that.clone( $( this ).closest( '.or-repeat' ) );
-                        //prevent default
+                        // Prevent default
                         return false;
                     } );
                     $form.on( 'click', 'button.remove:enabled', function() {
@@ -1553,13 +1549,13 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                         repLevel++;
                         repCountPath = $repeat.attr( 'data-repeat-count' ) || "";
                         numRepsInCount = ( repCountPath.length > 0 ) ? parseInt( model.node( repCountPath ).getVal()[ 0 ], 10 ) : 0;
-                        //console.debug('number of reps in count attribute: ' +numRepsInCount);
+                        // console.debug('number of reps in count attribute: ' +numRepsInCount);
                         index = $form.find( '.or-repeat[name="' + $repeat.attr( 'name' ) + '"]' ).index( $repeat );
                         $dataRepeat = model.node( $repeat.attr( 'name' ), index ).get();
                         numRepsInInstance = $dataRepeat.siblings( $dataRepeat.prop( 'nodeName' ) + ':not([template])' ).addBack().length;
                         numRepsDefault = ( numRepsInCount > numRepsInInstance ) ? numRepsInCount : numRepsInInstance;
-                        //console.debug('default number of repeats for '+$repeat.attr('name')+' is '+numRepsDefault);
-                        //first rep is already included (by XSLT transformation)
+                        // console.debug('default number of repeats for '+$repeat.attr('name')+' is '+numRepsDefault);
+                        // First rep is already included (by XSLT transformation)
                         for ( i = 1; i < numRepsDefault; i++ ) {
                             that.clone( $repeat.siblings().addBack().last(), false );
                         }
@@ -1591,6 +1587,7 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                     //var p = new Profiler('repeat cloning');
                     var $master, $clone, $parent, index, radioNames, i, path, timestamp, duration,
                         that = this;
+
                     duration = ( animate === false ) ? 0 : 400;
                     if ( $node.length !== 1 ) {
                         console.error( 'Nothing to clone' );
@@ -1600,10 +1597,10 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                     $master = $parent.children( '.or-repeat:not(.clone)' ).eq( 0 );
                     $clone = $master.clone( true, true );
 
-                    //add clone class and remove any child clones.. (cloned repeats within repeats..)
+                    // Add clone class and remove any child clones.. (cloned repeats within repeats..)
                     $clone.addClass( 'clone' ).find( '.clone' ).remove();
 
-                    //mark all cloned fields as valid
+                    // Mark all cloned fields as valid
                     $clone.find( '.invalid-required, .invalid-constraint' ).find( 'input, select, textarea' ).each( function() {
                         that.formO.setValid( $( this ) );
                     } );
@@ -1611,23 +1608,18 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                     $clone.insertAfter( $node )
                         .parent( '.or-group' ).numberRepeats();
 
-                    //if not done asynchronously, this code causes a "style undefined" exception in Jasmine unit tests with jQuery 1.9 and 2.0
-                    //but this breaks loading of default values inside repeats
-                    //this is caused by show() not being able to find the 'property "style" of undefined'
-                    //setTimeout(function(){
-                    $clone.clearInputs( '' ); //.show(duration, function(){
-                    //re-initiate widgets in clone
+
+                    $clone.clearInputs( '' );
+
+                    // Re-initiate widgets in clone
                     widgets.destroy( $clone );
                     widgets.init( $clone );
-                    //});
-                    //}, 0);
 
-                    //note: in http://formhub.org/formhub_u/forms/hh_polio_survey_cloned/form.xml a parent group of a repeat
-                    //has the same ref attribute as the nodeset attribute of the repeat. This would cause a problem determining 
-                    //the proper index if .or-repeat was not included in the selector
+                    // Note: in http://formhub.org/formhub_u/forms/hh_polio_survey_cloned/form.xml a parent group of a repeat
+                    // has the same ref attribute as the nodeset attribute of the repeat. This would cause a problem determining 
+                    // the proper index if .or-repeat was not included in the selector
                     index = $form.find( '.or-repeat[name="' + $node.attr( 'name' ) + '"]' ).index( $node );
-                    //parentIndex = $form.find('[name="'+$master.attr('name')+'"]').parent().index($parent);
-                    //add ____x to names of radio buttons where x is the index
+                    // add ____x to names of radio buttons where x is the index
                     radioNames = [];
 
                     $clone.find( 'input[type="radio"]' ).each( function() {
@@ -1637,21 +1629,18 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                     } );
 
                     for ( i = 0; i < radioNames.length; i++ ) {
-                        //amazingly, this executes so fast when compiled that the timestamp in milliseconds is
-                        //not sufficient guarantee of uniqueness (??)
+                        // Amazingly, this executes so fast when compiled that the timestamp in milliseconds is
+                        // not sufficient guarantee of uniqueness (??)
                         timestamp = new Date().getTime().toString() + '_' + Math.floor( ( Math.random() * 10000 ) + 1 );
                         $clone.find( 'input[type="radio"][data-name="' + radioNames[ i ] + '"]' ).attr( 'name', timestamp );
                     }
 
                     this.toggleButtons( $master.parent() );
 
-                    //create a new data point in <instance> by cloning the template node
+                    // Create a new data point in <instance> by cloning the template node
                     path = $master.attr( 'name' );
 
-                    //0-based index of node in a jquery resultset when using a selector with that name attribute
-                    /*
-                     * clone data node if it doesn't already exist
-                     */
+                    // Clone data node if it doesn't already exist
                     if ( path.length > 0 && index >= 0 ) {
                         model.cloneTemplate( path, index );
                     }
@@ -1809,10 +1798,6 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                     var $clone = $( event.target );
                     // Set defaults of added repeats in FormView, setAllVals does not trigger change event
                     that.setAllVals( $clone );
-                } );
-
-                $form.on( 'removerepeat', function( event ) {
-                    //TO DO
                 } );
 
                 $form.on( 'changelanguage', function() {
