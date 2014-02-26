@@ -293,6 +293,7 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                 $form = $( selector );
                 //used for testing
                 this.$ = $form;
+                this.$nonRepeats = {};
             }
 
             FormView.prototype.init = function() {
@@ -687,14 +688,14 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                     // values = value.split(' ');
                     index = index || 0;
 
-                    if ( this.getInputType( $form.find( '[data-name="' + name + '"]:eq(0)' ) ) == 'radio' ) {
+                    if ( this.getInputType( $form.find( '[data-name="' + name + '"]' ).eq( 0 ) ) == 'radio' ) {
                         $target = this.getWrapNodes( $form.find( '[data-name="' + name + '"]' ) ).eq( index ).find( 'input[value="' + value + '"]' );
                         // why not use this.getIndex?
                         $target.prop( 'checked', true );
                         return;
                     } else {
                         // why not use this.getIndex?
-                        $inputNodes = this.getWrapNodes( $form.find( '[name="' + name + '"]:eq(' + index + ')' ) ).find( 'input, select, textarea' );
+                        $inputNodes = this.getWrapNodes( $form.find( '[name="' + name + '"]' ).eq( index ) ).find( 'input, select, textarea' );
                         // console.log( 'input nodes with', name, $form.find( '[name="' + name + '"]' ) );
                         type = this.getInputType( $inputNodes.eq( 0 ) );
 
@@ -743,7 +744,6 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                         value = $( this ).text();
                         name = $( this ).getXPath( 'instance' );
                         index = model.node( name ).get().index( $( this ) );
-                        if ( value == 'hi' ) console.log( 'going to set hi', name, index, value );
                         that.input.setVal( name, index, value );
                     } catch ( e ) {
                         console.error( e );
@@ -764,7 +764,7 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                     $( '#form-languages' ).detach().appendTo( $langSelector );
 
                     if ( !defaultLang || defaultLang === '' ) {
-                        defaultLang = $( '#form-languages option:eq(0)' ).attr( 'value' );
+                        defaultLang = $( '#form-languages option' ).eq( 0 ).attr( 'value' );
                     }
                     $( '#form-languages' ).val( defaultLang );
 
@@ -836,55 +836,82 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
 
             /**
              * Crafts an optimized jQuery selector for element attributes that contain an expression with a target node name.
-             * The target node name is ALWAYS at the END of a path inside the expression.
              *
              * @param  {string} attribute The attribute name to search for
-             * @param  {string} nodeName  The node name to look for
              * @param  {?string} filter   The optional filter to append to each selector
-             * @return {Array.<string>}   An array of jQuery selectors
+             * @param  {{nodes:Array<string>=, repeatPath: string=, repeatIndex: number=}=} updated The object containing info on updated data nodes
+             * @return {jQuery}           A jQuery collection of elements
              */
-            FormView.prototype.getAttributeSelector = function( attribute, nodeName, filter ) {
-                var selector = [];
+            FormView.prototype.getNodesToUpdate = function( attr, filter, updated ) {
+                var $collection,
+                    $repeat = null,
+                    selector = [],
+                    that = this;
 
+                updated = updated || {};
                 filter = filter || '';
 
-                // #1: followed by space
-                selector.push( '[' + attribute + '*="/' + nodeName + ' "]' + filter );
-                // #2: followed by )
-                selector.push( '[' + attribute + '*="/' + nodeName + ')"]' + filter );
-                // #3: at the end of an expression
-                selector.push( '[' + attribute + '$="/' + nodeName + '"]' + filter );
+                // The collection of non-repeat 'inputs' is cached (unchangeable)
+                if ( !this.$nonRepeats[ attr ] ) {
+                    this.$nonRepeats[ attr ] = $form.find( filter + '[' + attr + ']' )
+                        .closest( '.calculation, .question, .note, .trigger' ).filter( function( index ) {
+                            return $( this ).closest( '.or-repeat' ).length === 0;
+                        } );
+                }
 
-                return selector;
+                // If the updated node is inside a repeat (and there are multiple repeats present)
+                if ( typeof updated.repeatPath !== 'undefined' && updated.repeatIndex >= 0 ) {
+                    console.log( 'going to find repeat with name', updated.repeatPath, 'and index', updated.repeatIndex );
+                    $repeat = $form.find( '.or-repeat[name="' + updated.repeatPath + '"]' ).eq( updated.repeatIndex );
+                }
+
+                // If the update was triggered from a repeat, it improves performance (a lot)
+                // to exclude all those repeats that did not trigger it...
+                $collection = ( $repeat ) ? this.$nonRepeats[ attr ].add( $repeat ) : $form;
+
+                if ( !updated.nodes || updated.nodes.length === 0 ) {
+                    selector = [ filter + '[' + attr + ']' ];
+                } else {
+                    updated.nodes.forEach( function( node ) {
+                        // The target node name is ALWAYS at the END of a path inside the expression.
+                        // #1: followed by space
+                        selector.push( filter + '[' + attr + '*="/' + node + ' "]' );
+                        // #2: followed by )
+                        selector.push( filter + '[' + attr + '*="/' + node + ')"]' );
+                        // #3: at the end of an expression
+                        selector.push( filter + '[' + attr + '$="/' + node + '"]' );
+                        // #4: followed by ] (used in itemset filters)
+                        selector.push( filter + '[' + attr + '*="/' + node + ']"]' );
+                    } );
+                }
+
+                //TODO: exclude descendents of disabled elements? .find( ':not(:disabled) span.active' )
+                console.log( 'collection', $collection );
+                console.log( 'repeat', $repeat );
+                console.log( 'selector', selector );
+                return $collection.find( selector.join() );
             };
 
             /**
              * Updates branches
              *
-             * @param {Array<{name: string, index: number}>=} updatedNodes Array of updated nodes
+             * @param {Array<string>=} updatedNodes Array of updated nodes
              */
-            FormView.prototype.branchUpdate = function( updatedNodes ) {
-                var p, $branchNode, result, insideRepeat, insideRepeatClone, cacheIndex,
-                    cleverSelector = [],
+            FormView.prototype.branchUpdate = function( updated ) {
+                var p, $branchNode, result, insideRepeat, insideRepeatClone, cacheIndex, $nodes,
                     relevantCache = {},
                     alreadyCovered = [],
                     that = this,
                     evaluations = 0,
                     clonedRepeatsPresent;
 
+                // console.log( 'branchUpdate', updated );
 
-                if ( typeof updatedNodes == 'undefined' || updatedNodes.length === 0 ) {
-                    cleverSelector = [ '[data-relevant]' ];
-                } else {
-                    updatedNodes.forEach( function( node ) {
-                        cleverSelector = cleverSelector
-                            .concat( that.getAttributeSelector( 'data-relevant', node.name ) );
-                    } );
-                }
+                $nodes = this.getNodesToUpdate( 'data-relevant', '', updated );
 
                 clonedRepeatsPresent = ( repeatsPresent && $form.find( '.or-repeat.clone' ).length > 0 ) ? true : false;
 
-                $form.find( cleverSelector.join() ).each( function() {
+                $nodes.each( function() {
                     //note that $(this).attr('name') is not the same as p.path for repeated radiobuttons!
                     if ( $.inArray( $( this ).attr( 'name' ), alreadyCovered ) !== -1 ) {
                         return;
@@ -1048,37 +1075,22 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
             /**
              * Updates itemsets
              *
-             * @param {Array<{name: string, index: number}>=} updatedNodes Array of updated nodes
+             * @param {Array<string>=} updatedNodes Array of updated nodes
              */
-            FormView.prototype.itemsetUpdate = function( updatedNodes ) {
-                var clonedRepeatsPresent, insideRepeat, insideRepeatClone,
+            FormView.prototype.itemsetUpdate = function( updated ) {
+                var clonedRepeatsPresent, insideRepeat, insideRepeatClone, $repeat, $nodes,
                     that = this,
                     cleverSelector = [],
                     needToUpdateLangs = false,
                     itemsCache = {};
 
+                // console.log( 'itemsetUpdate', updated );
 
-                if ( typeof updatedNodes == 'undefined' || updatedNodes.length === 0 ) {
-                    cleverSelector = [ '.itemset-template' ];
-                } else {
-                    updatedNodes.forEach( function( node ) {
-                        /* 
-                         * Note the space after value (#1), and ] after value (#2) to only look at the node name at end of path
-                         * This introduces a gigantic performance improvement for some forms (like bench8)
-                         * where there are multiple cascades with names such as country, country1, country2
-                         */
+                $nodes = this.getNodesToUpdate( 'data-items-path', '.itemset-template', updated );
 
-                        // #1 
-                        cleverSelector.push( '.itemset-template[data-items-path*="/' + node.name + ' "]' );
-                        // #2
-                        cleverSelector.push( '.itemset-template[data-items-path*="/' + node.name + ']"]' );
-                    } );
-                }
-
-                cleverSelector = cleverSelector.join( ',' );
                 clonedRepeatsPresent = ( repeatsPresent && $form.find( '.or-repeat.clone' ).length > 0 ) ? true : false;
 
-                $form.find( cleverSelector ).each( function() {
+                $nodes.each( function() {
                     var $htmlItem, $htmlItemLabels, /**@type {string}*/ value, $instanceItems, index, context,
                         $template = $( this ),
                         newItems = {},
@@ -1101,9 +1113,7 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                     insideRepeatClone = ( clonedRepeatsPresent && $input.closest( '.or-repeat.clone' ).length > 0 ) ? true : false;
 
                     index = ( insideRepeatClone ) ? that.input.getIndex( $input ) : 0;
-                    //console.log( 'inside clone?', insideRepeatClone );
 
-                    // console.log( 'xpath', itemsXpath, 'inside repeat', insideRepeat );
                     if ( typeof itemsCache[ itemsXpath ] !== 'undefined' ) {
                         $instanceItems = itemsCache[ itemsXpath ];
                     } else {
@@ -1178,30 +1188,22 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
             /**
              * Updates output values, optionally filtered by those values that contain a changed node name
              *
-             * @param {Array<{name: string, index: number}>=} updatedNodes Array of updated nodes
+             * @param {Array<string>=} updatedNodes Array of updated nodes
              */
-            FormView.prototype.outputUpdate = function( updatedNodes ) {
-                var expr, clonedRepeatsPresent, insideRepeat, insideRepeatClone, $context, context, index,
-                    cleverSelector = [],
-                    outputChanged = false,
+            FormView.prototype.outputUpdate = function( updated ) {
+                var expr, clonedRepeatsPresent, insideRepeat, insideRepeatClone, $context, context, index, $nodes,
                     outputCache = {},
                     val = '',
                     that = this;
 
-                if ( typeof updatedNodes == 'undefined' || updatedNodes.length === 0 ) {
-                    cleverSelector = [ '.or-output[data-value]' ];
-                } else {
-                    updatedNodes.forEach( function( node ) {
-                        cleverSelector = cleverSelector.concat( that.getAttributeSelector( 'data-value', node.name, '.or-output' ) );
-                    } );
-                }
+                // console.log( 'outputUpdate', updated );
+
+                $nodes = this.getNodesToUpdate( 'data-value', '.or-output', updated );
 
                 clonedRepeatsPresent = ( repeatsPresent && $form.find( '.or-repeat.clone' ).length > 0 ) ? true : false;
 
-                $form.find( ':not(:disabled) span.active' ).find( cleverSelector.join() ).each( function() {
+                $nodes.each( function() {
                     expr = $( this ).attr( 'data-value' );
-                    //context = that.input.getName($(this).closest('fieldset'));
-
                     /*
                      * Note that in XForms input is the parent of label and in HTML the other way around so an output inside a label
                      * should look at the HTML input to determine the context.
@@ -1210,9 +1212,9 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                      * or the whole document
                      */
                     $context = ( $( this ).parent( 'span' ).parent( 'label' ).find( '[name]' ).eq( 0 ).length === 1 ) ?
-                        $( this ).parent().parent().find( '[name]:eq(0)' ) :
+                        $( this ).parent().parent().find( '[name]' ).eq( 0 ) :
                         $( this ).parent( 'span' ).parent( 'legend' ).parent( 'fieldset' ).find( '[name]' ).eq( 0 ).length === 1 ?
-                        $( this ).parent().parent().parent().find( '[name]:eq(0)' ) : $( this ).closest( '[name]' );
+                        $( this ).parent().parent().parent().find( '[name]' ).eq( 0 ) : $( this ).closest( '[name]' );
                     context = that.input.getName( $context );
                     insideRepeat = ( clonedRepeatsPresent && $( this ).closest( '.or-repeat' ).length > 0 );
                     insideRepeatClone = ( clonedRepeatsPresent && $( this ).closest( '.or-repeat.clone' ).length > 0 );
@@ -1228,7 +1230,6 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                     }
                     if ( $( this ).text !== val ) {
                         $( this ).text( val );
-                        outputChanged = true;
                     }
                 } );
             };
@@ -1255,47 +1256,59 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
             /**
              * Updates calculated items
              *
-             * @param {Array<{name: string, index: number}>=} updatedNodes Array of updated nodes
+             * @param { jQuery=}         $repeat        The repeat that triggered the update
+             * @param {Array<string>=}  updatedNodes    Array of updated nodes
              */
-            FormView.prototype.calcUpdate = function( updatedNodes ) {
-                var name, expr, dataType, relevant, relevantExpr, result, constraint, valid, $this, $dataNodes,
-                    cleverSelector = [],
+            FormView.prototype.calcUpdate = function( updated ) {
+                var $nodes,
                     that = this;
 
+                updated = updated || {};
 
-                if ( typeof updatedNodes == 'undefined' || updatedNodes.length === 0 ) {
-                    cleverSelector = [ '[data-calculate]' ];
-                } else {
-                    updatedNodes.forEach( function( node ) {
-                        /* 
-                         * Select the calculated items that include the changed node PLUS
-                         * the calculated items that have relevant logic that include the changed node
-                         */
-                        cleverSelector = cleverSelector
-                            .concat( that.getAttributeSelector( 'data-calculate', node.name ) )
-                            .concat( that.getAttributeSelector( 'data-relevant', node.name, '[data-calculate]' ) );
-                    } );
-                }
+                // console.log( 'calcUpdate', updated );
 
-                $form.find( cleverSelector.join() ).each( function() {
-                    $this = $( this );
-                    name = $this.attr( 'name' );
-                    expr = $this.attr( 'data-calculate' );
-                    dataType = $this.attr( 'data-type-xml' );
-                    constraint = $this.attr( 'data-constraint' ); //obsolete?
-                    relevantExpr = $this.attr( 'data-relevant' );
-                    relevant = ( relevantExpr ) ? model.evaluate( relevantExpr, 'boolean', name ) : true;
+                $nodes = this.getNodesToUpdate( 'data-calculate', '', updated );
+                // add relevant items that have a (any) calculation
+                // TODO: it would make sense to just add this to branchUpdate to clear any calculated item values
+                $nodes = $nodes.add( this.getNodesToUpdate( 'data-relevant', '[data-calculate]' ) );
+
+                console.log( 'nodes to update', $nodes );
+
+                $nodes.each( function() {
+                    var result, valid, $dataNodes, $dataNode, index,
+                        $this = $( this ),
+                        name = $this.attr( 'name' ),
+                        dataNodeName = ( name.lastIndexOf( '/' ) !== -1 ) ? name.substring( name.lastIndexOf( '/' ) + 1 ) : name,
+                        expr = $this.attr( 'data-calculate' ),
+                        dataType = $this.attr( 'data-type-xml' ),
+                        // for inputs that have a calculation and need to be validated
+                        constraint = $this.attr( 'data-constraint' ),
+                        relevantExpr = $this.attr( 'data-relevant' ),
+                        relevant = ( relevantExpr ) ? model.evaluate( relevantExpr, 'boolean', name ) : true;
+
+                    /*
+                     * If the update was triggered by a datanode inside a repeat
+                     * and the dependent node is inside the same repeat
+                     */
                     $dataNodes = model.node( name ).get();
-                    $dataNodes.each( function( index ) {
-                        //not sure if using 'string' is always correct
-                        result = ( relevant ) ? model.evaluate( expr, 'string', name, index ) : '';
-                        valid = model.node( name, index ).setVal( result, constraint, dataType );
 
-                        // not the most efficient to use input.setVal here as it will do another lookup
-                        // of the node, that we already have... 
-                        that.input.setVal( name, index, result );
-                    } );
+                    if ( $dataNodes.length > 1 && updated.repeatPath && name.indexOf( updated.repeatPath ) !== -1 ) {
+                        $dataNode = model.node( updated.repeatPath, updated.repeatIndex ).get().find( dataNodeName );
+                        index = $dataNodes.index( $dataNode );
+                    } else if ( $dataNodes.length === 1 ) {
+                        index = 0;
+                    } else {
+                        console.error( 'Multiple data nodes with same path found. Sorry I cannot deal with this. ' );
+                        return;
+                    }
 
+                    //not sure if using 'string' is always correct
+                    result = ( relevant ) ? model.evaluate( expr, 'string', name, index ) : '';
+                    valid = model.node( name, index ).setVal( result, constraint, dataType );
+
+                    // not the most efficient to use input.setVal here as it will do another lookup
+                    // of the node, that we already have...
+                    that.input.setVal( name, index, result );
                 } );
             };
 
@@ -1335,8 +1348,9 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
             /*
              * Note that preloaders may be deprecated in the future and be handled as metadata without bindings at all, in which
              * case all this stuff should perhaps move to FormModel
+             *
+             * functions are designed to fail silently if unknown preloaders are called
              */
-            //functions are designed to fail silently if unknown preloaders are called
             FormView.prototype.preloads = {
                 init: function( parentO ) {
                     var item, param, name, curVal, newVal, meta, dataNode, props, xmlType,
@@ -1673,7 +1687,7 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
 
                     //then enable the appropriate ones
                     $node.find( '.or-repeat:last-child > .repeat-buttons button.repeat' ).prop( 'disabled', false ); //.button('enable');
-                    $node.find( 'button.remove:not(:eq(0))' ).prop( 'disabled', false );
+                    $node.find( 'button.remove' ).not( ':eq(0)' ).prop( 'disabled', false );
                 }
             };
 
@@ -1741,7 +1755,7 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                     var props = that.input.getProps( $( this ) ),
                         required = $( this ).attr( 'required' ),
                         $question = $( this ).closest( '.question' ),
-                        $legend = $question.find( 'legend:eq(0)' ),
+                        $legend = $question.find( 'legend' ).eq( 0 ),
                         loudErrorShown = $question.hasClass( 'invalid-required' ) || $question.hasClass( 'invalid-constraint' ),
                         insideTable = ( $( this ).closest( '.or-appearance-list-nolabel' ).length > 0 ),
                         $reqSubtle = $question.find( '.required-subtle' ),
@@ -1776,13 +1790,12 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                     }
                 } );
 
-                model.$.on( 'dataupdate', function( event, data ) {
-                    that.calcUpdate( data.updatedNodes ); //EACH CALCUPDATE THAT CHANGES A VALUE TRIGGERS ANOTHER CALCUPDATE => INEFFICIENT
-                    that.branchUpdate( data.updatedNodes );
-                    that.outputUpdate( data.updatedNodes );
-                    that.itemsetUpdate( data.updatedNodes );
-                    //it is possible that a changed data value validates question that were previously invalidated
-                    //that.validateInvalids();
+                model.$.on( 'dataupdate', function( event, updated ) {
+                    // console.log( 'dataupdate', updated );
+                    that.calcUpdate( updated ); //EACH CALCUPDATE THAT CHANGES A VALUE TRIGGERS ANOTHER CALCUPDATE => INEFFICIENT
+                    that.branchUpdate( updated );
+                    that.outputUpdate( updated );
+                    that.itemsetUpdate( updated );
                 } );
 
                 // edit is fired when the form changes due to user input or repeats added/removed
@@ -1793,13 +1806,14 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
                 } );
 
                 $form.on( 'addrepeat', function( event ) {
-                    //set defaults of added repeats, setAllVals does not trigger change event
-                    //TODO: only do this for the repeat that triggers it
-                    that.setAllVals();
-                    //the cloned fields may have been marked as invalid, so after setting thee default values, validate the invalid ones
-                    //that.validateInvalids();
+                    var $clone = $( event.target );
+                    // Set defaults of added repeats in FormView, setAllVals does not trigger change event
+                    that.setAllVals( $clone );
                 } );
 
+                $form.on( 'removerepeat', function( event ) {
+                    //TO DO
+                } );
 
                 $form.on( 'changelanguage', function() {
                     that.outputUpdate();
