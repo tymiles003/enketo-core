@@ -613,6 +613,46 @@ define( [ 'xpath', 'jquery', 'enketo-js/plugins', 'enketo-js/extend', 'jquery.xp
     };
 
     /**
+     * Converts an indexed-repeat(node, path, position, path, position, etc) to its native XPath
+     * equivalent using [position() = x] predicates
+     *
+     * @param  {string} expr the XPath expression
+     * @return {string}      converted XPath expression
+     */
+    FormModel.prototype.convertIndexedRepeatToPositionedPath = function( expr ) {
+        var indexedRepeats = expr.match( /(indexed-repeat\s?\([^\)]+\))/g );
+
+        if ( !indexedRepeats ) {
+            return expr;
+        }
+
+        indexedRepeats.forEach( function( indexedRepeat, irIndex ) {
+            var i, positionedPath,
+                params = indexedRepeat.replace( /indexed-repeat\s?\(([^\)]+)\)/g, '$1' ).split( ',' );
+
+            if ( params.length % 2 === 1 ) {
+
+                //trim parameters
+                params.forEach( function( param, index ) {
+                    params[ index ] = param.trim();
+                } );
+
+                positionedPath = params[ 0 ];
+
+                for ( i = params.length - 1; i > 1; i -= 2 ) {
+                    positionedPath = positionedPath.replace( params[ i - 1 ], params[ i - 1 ] + '[position() = ' + params[ i ] + ']' );
+                }
+                expr = expr.replace( indexedRepeat, positionedPath );
+
+            } else {
+                console.error( 'indexed repeat with incorrect number of parameters found', indexedRepeat );
+                return "'Error with indexed-repeat parameters'";
+            }
+        } );
+        return expr;
+    };
+
+    /**
      * Evaluates an XPath Expression using XPathJS_javarosa (not native XPath 1.0 evaluator)
      *
      * This function does not seem to work properly for nodeset resulttypes otherwise:
@@ -638,6 +678,7 @@ define( [ 'xpath', 'jquery', 'enketo-js/plugins', 'enketo-js/extend', 'jquery.xp
         resTypeStr = resTypeStr || 'any';
         index = index || 0;
 
+        expr = this.convertIndexedRepeatToPositionedPath( expr );
         expr = expr.trim();
 
         /* 

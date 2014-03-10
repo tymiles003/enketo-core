@@ -890,7 +890,14 @@ define( [ 'enketo-js/FormModel', 'enketo-js/widgets', 'jquery', 'enketo-js/plugi
 
                 // If the update was triggered from a repeat, it improves performance (a lot)
                 // to exclude all those repeats that did not trigger it...
+                // However, this would break if people are referring to nodes in other
+                // repeats such as with /path/to/repeat[3]/node or indexed-repeat(/path/to/repeat/node /path/to/repeat, 3)
+                // To play it safe we could add to the collection all repeat that contain them:
+                //           $form.find( attr + '*="indexed-repeat"]').closest('.or-repeat');
+                //           $form.find( attr + '*="position()"').closest('.or-repeat');
                 $collection = ( $repeat ) ? this.$nonRepeats[ attr ].add( $repeat ) : $form;
+                $collection = ( $repeat ) ? $collection.add( $form.find( '[' + attr + '*="indexed-repeat' + '""]' ).closest( '.or-repeat' ) ) : $collection;
+                $collection = ( $repeat ) ? $collection.add( $form.find( '[' + attr + '*="position()' + '""]' ) ).closest( '.or-repeat' ) : $collection;
 
                 if ( !updated.nodes || updated.nodes.length === 0 ) {
                     selector = [ filter + '[' + attr + ']' ];
