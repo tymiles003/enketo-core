@@ -20,12 +20,14 @@ define( [ 'jquery', 'enketo-js/Widget', 'text!enketo-config', 'leaflet' ],
 
         var pluginName = 'geopicker',
             config = JSON.parse( configStr ),
-            //defaultView = [ 39.7334, -104.9926 ],
             defaultZoom = 15,
-            tile = ( config && config.tile && config.tile.source ) ? config.tile : {
-                "source": "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-                "attribution": 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors'
-            },
+            // MapBox TileJSON format
+            maps = ( config && config.maps && config.maps.length > 0 ) ? config.maps : [ {
+                "name": "streets",
+                "maxzoom": 24,
+                "tiles": [ "http://{s}.tile.openstreetmap.se/hydda/full/{z}/{x}/{y}.png" ],
+                "attribution": "Tiles courtesy of <a href=\"http://hot.openstreetmap.se/\" target=\"_blank\">OpenStreetMap Sweden</a> &mdash; Map data &copy; <a href=\"http://openstreetmap.org\">OpenStreetMap</a> contributors, <a href=\"http://creativecommons.org/licenses/by-sa/2.0/\">CC-BY-SA</a>"
+            } ],
             searchSource = "https://maps.googleapis.com/maps/api/geocode/json?address={address}&sensor=true&key={api_key}",
             iconSingle = L.divIcon( {
                 iconSize: 24,
@@ -39,6 +41,8 @@ define( [ 'jquery', 'enketo-js/Widget', 'text!enketo-config', 'leaflet' ],
                 iconSize: 16,
                 className: 'enketo-geopoint-circle-marker-active'
             } );
+
+        console.log( 'config in geopicker', config );
 
         /**
          * Geotrace widget Class
@@ -191,11 +195,24 @@ define( [ 'jquery', 'enketo-js/Widget', 'text!enketo-config', 'leaflet' ],
          * @return {{search: boolean, detect: boolean, map: boolean, updateMapFn: string, type: string}} The widget properties object
          */
         Geopicker.prototype._getProps = function() {
-            var map = this.options.touch !== true || ( this.options.touch === true && $( this.element ).closest( '.or-appearance-maps' ).length > 0 );
+            var appearances = [],
+                map = this.options.touch !== true || ( this.options.touch === true && $( this.element ).closest( '.or-appearance-maps' ).length > 0 );
+
+            if ( map ) {
+                appearances = $( this.element ).closest( '.question' ).attr( 'class' ).split( ' ' )
+                    .filter( function( item ) {
+                        return item !== 'or-appearance-maps' && /or-appearance-/.test( item );
+                    } );
+                appearances.forEach( function( appearance, index ) {
+                    appearances[ index ] = appearance.substring( 14 );
+                } );
+            }
+
             return {
                 detect: !!navigator.geolocation,
                 map: map,
                 search: map,
+                appearances: appearances,
                 //updateMapFn: map ? ( this.options.touch ? "_updateStaticMap" : "_updateDynamicMap" ) : null,
                 type: this.element.attributes[ 'data-type-xml' ].textContent,
                 touch: this.options.touch
@@ -587,12 +604,17 @@ define( [ 'jquery', 'enketo-js/Widget', 'text!enketo-config', 'leaflet' ],
          * @param  {number} zoom zoom
          */
         Geopicker.prototype._updateDynamicMap = function( latLng, zoom ) {
-            var z, that = this;
+            var z, layers, options, baseMaps, that = this;
 
-            console.log( 'dynamic map to be updated with latLng', latLng );
+            // console.log( 'dynamic map to be updated with latLng', latLng );
             if ( !this.map ) {
-                console.log( 'no map yet, creating it' );
-                this.map = L.map( 'map' + this.mapId )
+                layers = this._getLayers()
+                options = {
+                    layers: this._getDefaultLayer( layers )
+                };
+
+                // console.log( 'no map yet, creating it' );
+                this.map = L.map( 'map' + this.mapId, options )
                     .on( 'click', function( e ) {
                         console.log( 'clicked on map', e.latlng );
                         // do nothing if the field has a current marker
@@ -605,13 +627,27 @@ define( [ 'jquery', 'enketo-js/Widget', 'text!enketo-config', 'leaflet' ],
                         }
                     } );
 
-                L.tileLayer( tile[ "source" ], {
-                    attribution: tile[ "attribution" ],
-                    maxZoom: 18
-                } ).addTo( this.map );
+                //L.tileLayer( tile[ "source" ], {
+                //    attribution: tile[ "attribution" ],
+                //    maxZoom: 24
+                //} ).addTo( this.map );
 
                 // watch out, default "Leaflet" link clicks away from page, loosing all data
                 this.map.attributionControl.setPrefix( '' );
+
+                // add layer control
+                if ( layers.length > 1 ) {
+                    L.control.layers( this._getBaseLayers( layers ), null ).addTo( this.map );
+                }
+
+                // Add ignore and option-label class to Leaflet-added input elements and their labels
+                // something weird seems to happen. It seems the layercontrol is added twice (second replacing first) 
+                // which means the classes are not present in the final control. 
+                // Using the baselayerchange event handler is a trick that seems to work.
+                this.map.on( 'baselayerchange', function() {
+                    that.$widget.find( '.leaflet-control-container input' ).addClass( 'ignore' ).next( 'span' ).addClass( 'option-label' );
+                } );
+
             }
 
             if ( !latLng ) {
@@ -631,6 +667,50 @@ define( [ 'jquery', 'enketo-js/Widget', 'text!enketo-config', 'leaflet' ],
                 console.log( 'setting map view with center', latLng );
                 this.map.setView( latLng, zoom );
             }
+        };
+
+        Geopicker.prototype._getLayers = function() {
+            var url, name, attribution,
+                iterator = 1,
+                layers = [];
+
+            maps.forEach( function( map ) {
+                // TODO: randomly pick from tiles array?
+                url = map.tiles[ map.tiles.length - 1 ];
+                name = map.name || 'map-' + iterator++;
+                attribution = map.attribution || '';
+                layers.push( L.tileLayer( url, {
+                    id: map.id || name,
+                    name: name,
+                    attribution: attribution
+                } ) );
+            } );
+
+            return layers;
+        };
+
+        Geopicker.prototype._getDefaultLayer = function( layers ) {
+            var defaultLayer,
+                that = this;
+
+            layers.reverse().some( function( layer ) {
+                defaultLayer = layer;
+                return that.props.appearances.some( function( appearance ) {
+                    return appearance === layer.options.name;
+                } );
+            } );
+
+            return defaultLayer;
+        };
+
+        Geopicker.prototype._getBaseLayers = function( layers ) {
+            var baseLayers = {};
+
+            layers.forEach( function( layer ) {
+                baseLayers[ layer.options.name ] = layer;
+            } );
+
+            return baseLayers;
         };
 
         /**
