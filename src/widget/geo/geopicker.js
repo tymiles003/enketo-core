@@ -1,5 +1,5 @@
 /**
- * @preserve Copyright 2012 Martijn van de Rijdt & Modi Labs
+ * @preserve Copyright 2014 Martijn van de Rijdt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,8 +41,6 @@ define( [ 'jquery', 'enketo-js/Widget', 'text!enketo-config', 'leaflet' ],
                 iconSize: 16,
                 className: 'enketo-geopoint-circle-marker-active'
             } );
-
-        console.log( 'config in geopicker', config );
 
         /**
          * Geotrace widget Class
@@ -496,26 +494,6 @@ define( [ 'jquery', 'enketo-js/Widget', 'text!enketo-config', 'leaflet' ],
                             .always( function() {
 
                             } );
-                        /*$.get( "http://nominatim.openstreetmap.org/search/" + address + "?format=json", function( response ) {
-                            var location = response[ 0 ] || null;
-                            if ( location && location.lat && location.lon ) {
-                                that._updateMap( [ location.lat, location.lon ], defaultZoom );
-                                that.$search.closest( '.input-group' ).removeClass( 'has-error' );
-                            } else {
-                                //TODO: add error message
-                                that.$search.closest( '.input-group' ).addClass( 'has-error' );
-                                console.log( "Location '" + address + "' not found" );
-                            }
-                        }, 'json' )
-                            .fail( function() {
-                                //TODO: add error message
-                                that.$search.closest( '.input-group' ).addClass( 'has-error' );
-                                console.log( "Error. Geocoding service may not be available or app is offline" );
-                            } )
-                            .always( function() {
-
-                            } );
-                        */
                     } else {
 
                     }
@@ -567,35 +545,6 @@ define( [ 'jquery', 'enketo-js/Widget', 'text!enketo-config', 'leaflet' ],
             }
         };
 
-
-
-        /**
-         * Loads a static map. (No markers due to difficult of determining zoom level that would show all of them)
-         *
-         * @param  @param  {Array.<number>|{lat: number, lng: number}} latLng  latitude and longitude coordinates
-         * @param  {number} zoom zoom level
-         */
-        /*Geopicker.prototype._updateStaticMap = function( latLng, zoom ) {
-            var lat, lng, width, height,
-                markers = '';
-
-            if ( !this.props.map ) {
-                return;
-            }
-
-            latLng = latLng || this.points[ 0 ] || defaultLatLng;
-
-            lat = latLng[ 0 ] || latLng.lat || 0;
-            lng = latLng[ 1 ] || latLng.lng || 0;
-            width = Math.round( this.$map.width() );
-            height = Math.round( this.$map.height() );
-
-            this.$map.addClass( 'static' ).empty().append(
-                '<img src="' + tile[ "static" ][ "source" ].replace( '{markers}/', '' ).replace( '{lat}', lat ).replace( '{lon}', lng ).replace( '{z}', defaultZoom ).replace( '{width}', width ).replace( '{height}', height ) + '"/>' +
-                '<div class="attribution">' + tile[ "static" ][ "attribution" ] + '</div>'
-            );
-        };*/
-
         /**
          * Updates the dynamic map to either show the provided coordinates (in the center), with the provided zoom level
          * or updates any markers, polylines, polygons
@@ -626,11 +575,6 @@ define( [ 'jquery', 'enketo-js/Widget', 'text!enketo-config', 'leaflet' ],
                             that._updateInputs( e.latlng, 'change.bymap' );
                         }
                     } );
-
-                //L.tileLayer( tile[ "source" ], {
-                //    attribution: tile[ "attribution" ],
-                //    maxZoom: 24
-                //} ).addTo( this.map );
 
                 // watch out, default "Leaflet" link clicks away from page, loosing all data
                 this.map.attributionControl.setPrefix( '' );
@@ -721,7 +665,7 @@ define( [ 'jquery', 'enketo-js/Widget', 'text!enketo-config', 'leaflet' ],
                 markers = [],
                 that = this;
 
-            console.log( 'updateing markers', this.points );
+            // console.log( 'updating markers', this.points );
 
             if ( this.markerLayer ) {
                 this.markerLayer.clearLayers();
@@ -736,41 +680,30 @@ define( [ 'jquery', 'enketo-js/Widget', 'text!enketo-config', 'leaflet' ],
                 if ( that._isValidLatLng( latLng ) ) {
                     coords.push( latLng );
                     markers.push( L.marker( latLng, {
-                            icon: icon,
-                            clickable: true,
-                            draggable: true,
-                            alt: index,
-                            opacity: 0.9
-                        } ).on( 'click', function( e ) {
-                            console.log( 'clicked marker', e );
-                            if ( e.target.options.alt === 0 && that.props.type === 'geoshape' ) {
-                                that._closePolygon();
-                            } else {
-                                that._setCurrent( e.target.options.alt );
-                            }
-                        } ).on( 'dragend', function( e ) {
-                            var latLng = e.target.getLatLng();
-                            // first set the current index the point dragged
-                            that._setCurrent( e.target.options.alt );
-                            that._updateInputs( latLng, 'change.bymap' );
-                            that._updateMap();
-                        } )
-                        /*.on( 'mouseover', function( e ) {
-                        console.log( 'mousover!', e );
+                        icon: icon,
+                        clickable: true,
+                        draggable: true,
+                        alt: index,
+                        opacity: 0.9
+                    } ).on( 'click', function( e ) {
                         if ( e.target.options.alt === 0 && that.props.type === 'geoshape' ) {
-                            var popup = L.popup()
-                                .setLatLng( e.latlng )
-                                .setContent( 'click point to close the shape' )
-                                .openOn( that.map );
+                            that._closePolygon();
+                        } else {
+                            that._setCurrent( e.target.options.alt );
                         }
-                    } )*/
-                    );
+                    } ).on( 'dragend', function( e ) {
+                        var latLng = e.target.getLatLng();
+                        // first set the current index the point dragged
+                        that._setCurrent( e.target.options.alt );
+                        that._updateInputs( latLng, 'change.bymap' );
+                        that._updateMap();
+                    } ) );
                 } else {
-                    console.log( 'this latLng was not considered valid', latLng );
+                    console.error( 'this latLng was not considered valid', latLng );
                 }
             } );
 
-            console.log( 'markers to update', markers );
+            // console.log( 'markers to update', markers );
 
             if ( markers.length > 0 ) {
                 this.markerLayer = L.layerGroup( markers ).addTo( this.map );
@@ -794,7 +727,7 @@ define( [ 'jquery', 'enketo-js/Widget', 'text!enketo-config', 'leaflet' ],
                 return;
             }
 
-            console.log( 'updating polyline' );
+            // console.log( 'updating polyline' );
             if ( this.points.length < 2 || !this._isValidLatLngList( this.points ) ) {
                 // remove quirky line remainder
                 if ( this.map ) {
@@ -807,29 +740,13 @@ define( [ 'jquery', 'enketo-js/Widget', 'text!enketo-config', 'leaflet' ],
                 }
                 this.polyline = null;
                 this.polygon = null;
-                console.log( 'list of points invalid' );
+                // console.log( 'list of points invalid' );
                 return;
             }
 
-            // polyline and polygon are mutually exclusive
             if ( this.props.type === 'geoshape' ) {
-                /*console.log( 'detected that this polyline is a polygon' );
-                if ( this.polyline ) {
-                    if ( this.map ) {
-                        this.map.removeLayer( this.polyline );
-                    }
-                    this.polyline = null;
-                }*/
-
                 this._updatePolygon();
-                //return;
             }
-            /*else if ( this.polygon ) {
-                if ( this.map ) {
-                    this.map.removeLayer( this.polygon );
-                }
-                this.polygon = null;
-            }*/
 
             polylinePoints = ( this.points[ this.points.length - 1 ].join( '' ) !== '' ) ? this.points : this.points.slice( 0, this.points.length - 1 );
 
@@ -841,8 +758,8 @@ define( [ 'jquery', 'enketo-js/Widget', 'text!enketo-config', 'leaflet' ],
             } else {
                 this.polyline.setLatLngs( polylinePoints );
             }
+
             this.map.fitBounds( this.polyline.getBounds() );
-            console.log( 'done updating polyline' );
         };
 
 
@@ -857,29 +774,21 @@ define( [ 'jquery', 'enketo-js/Widget', 'text!enketo-config', 'leaflet' ],
                 return;
             }
 
-            console.log( 'updating polygon' );
-
+            // console.log( 'updating polygon' );
             polygonPoints = ( this.points[ this.points.length - 1 ].join( '' ) !== '' ) ? this.points : this.points.slice( 0, this.points.length - 1 );
 
             if ( !this.polygon ) {
-                console.log( 'creating new polygon' );
+                // console.log( 'creating new polygon' );
                 this.polygon = L.polygon( polygonPoints, {
                     color: 'red',
                     stroke: false
                 } );
                 this.map.addLayer( this.polygon );
             } else {
-                console.log( 'updating existing polygon', this.points );
+                // console.log( 'updating existing polygon', this.points );
                 this.polygon.setLatLngs( polygonPoints );
             }
-            //this.map.fitBounds( this.polygon.getBounds() );
-            console.log( 'done updating polygon' );
         };
-
-        /*Geopicker.prototype._isPolygon = function( latLngs ) {
-            // no need to check for validaty of latLngs. This already happened in _updatePolyline.
-            return this.props.type === 'geoshape' && latLngs.length >= 4 && JSON.stringify( latLngs[ 0 ] ) === JSON.stringify( latLngs[ latLngs.length - 1 ] );
-        };*/
 
 
         Geopicker.prototype._addPoint = function() {
