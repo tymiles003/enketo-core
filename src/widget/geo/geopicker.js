@@ -556,7 +556,7 @@ define( [ 'jquery', 'enketo-js/Widget', 'text!enketo-config', 'leaflet' ],
 
             // console.log( 'dynamic map to be updated with latLng', latLng );
             if ( !this.map ) {
-                layers = this._getLayers()
+                layers = this._getLayers();
                 options = {
                     layers: this._getDefaultLayer( layers )
                 };
@@ -618,8 +618,10 @@ define( [ 'jquery', 'enketo-js/Widget', 'text!enketo-config', 'leaflet' ],
                 layers = [];
 
             maps.forEach( function( map ) {
-                // TODO: randomly pick from tiles array?
-                url = map.tiles[ map.tiles.length - 1 ];
+                // randomly pick a tile source from the array and store it in the maps config
+                // so it will be re-used when the form is reset or multiple geo widgets are created
+                map.tileIndex = map.tileIndex || Math.round( Math.random() * 100 ) % map.tiles.length,
+                url = map.tiles[ map.tileIndex ];
                 name = map.name || 'map-' + iterator++;
                 attribution = map.attribution || '';
                 layers.push( L.tileLayer( url, {
