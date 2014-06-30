@@ -583,6 +583,9 @@ define( [ 'jquery', 'enketo-js/Widget', 'text!enketo-config', 'leaflet' ],
                     L.control.layers( this._getBaseLayers( layers ), null ).addTo( this.map );
                 }
 
+                // change default leaflet layer control button
+                that.$widget.find( '.leaflet-control-layers-toggle' ).append( '<span class="glyphicon glyphicon-globe"></span>' );
+
                 // Add ignore and option-label class to Leaflet-added input elements and their labels
                 // something weird seems to happen. It seems the layercontrol is added twice (second replacing first) 
                 // which means the classes are not present in the final control. 
@@ -620,7 +623,7 @@ define( [ 'jquery', 'enketo-js/Widget', 'text!enketo-config', 'leaflet' ],
             maps.forEach( function( map ) {
                 // randomly pick a tile source from the array and store it in the maps config
                 // so it will be re-used when the form is reset or multiple geo widgets are created
-                map.tileIndex = map.tileIndex || Math.round( Math.random() * 100 ) % map.tiles.length,
+                map.tileIndex = ( map.tileIndex !== 'undefined' ) ? Math.round( Math.random() * 100 ) % map.tiles.length : map.tileIndex;
                 url = map.tiles[ map.tileIndex ];
                 name = map.name || 'map-' + iterator++;
                 attribution = map.attribution || '';
