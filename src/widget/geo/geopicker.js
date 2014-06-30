@@ -211,7 +211,6 @@ define( [ 'jquery', 'enketo-js/Widget', 'text!enketo-config', 'leaflet' ],
                 map: map,
                 search: map,
                 appearances: appearances,
-                //updateMapFn: map ? ( this.options.touch ? "_updateStaticMap" : "_updateDynamicMap" ) : null,
                 type: this.element.attributes[ 'data-type-xml' ].textContent,
                 touch: this.options.touch
             };
@@ -589,7 +588,7 @@ define( [ 'jquery', 'enketo-js/Widget', 'text!enketo-config', 'leaflet' ],
                 // which means the classes are not present in the final control. 
                 // Using the baselayerchange event handler is a trick that seems to work.
                 this.map.on( 'baselayerchange', function() {
-                    that.$widget.find( '.leaflet-control-container input' ).addClass( 'ignore' ).next( 'span' ).addClass( 'option-label' );
+                    that.$widget.find( '.leaflet-control-container input' ).addClass( 'ignore no-unselect' ).next( 'span' ).addClass( 'option-label' );
                 } );
 
             }
