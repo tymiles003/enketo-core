@@ -703,7 +703,7 @@ define( [ 'jquery', 'enketo-js/Widget', 'text!enketo-config', 'leaflet' ],
                         that._updateMap();
                     } ) );
                 } else {
-                    console.error( 'this latLng was not considered valid', latLng );
+                    console.log( 'this latLng was not considered valid', latLng );
                 }
             } );
 
